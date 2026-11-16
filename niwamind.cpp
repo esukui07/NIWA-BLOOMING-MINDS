@@ -8,6 +8,8 @@
 #include <cctype>
 #include <chrono>
 #include <thread>
+#include <vector>
+#include "math_problem.h"
 using namespace std;
 
 void showTitleScreen();
@@ -30,8 +32,10 @@ const int COLOR_BAD = 12;  // Light red
 const int COLOR_INFO = 14; // Yellow
 
 // ─── Main Function ─────────────────────────────────
-int main() {
+int main(){
     srand(time(0)); // Seed the random number generator with the current time
+
+    SetConsoleOutputCP(CP_UTF8); // Allows the terminal to print multi-byte Unicode symbols such as the ones used for the progress bar
     
     showTitleScreen(); // Show the title screen
     int choice;
@@ -128,13 +132,37 @@ void showFlowerTells() {
     pauseScreen();
 }
 
+void progressBar(int completed, int totalQuestions, int difficulty, double answer, double correctAnswer, double correctAnswer2){
+    int barWidth = 0;
+
+    if(difficulty == 1){
+        barWidth = 10;
+    }else if(difficulty == 2){
+        barWidth = 15;
+    }else{
+        barWidth = 20;
+    }
+
+    int filledBlocks = (completed * barWidth) / totalQuestions;
+
+    cout << "Progress: ";
+
+    for(int i = 1; i < barWidth; i++){
+        if(i < filledBlocks){
+            cout << "▮";
+        }else{
+            cout << "▯";
+        }
+    }
+}
+
 double generateNumber(int difficulty){
     if(difficulty == 1){
-        return rand() % 9 + 1;
+        return rand() % 10 + 1;
     }else if(difficulty == 2){ 
-        return rand() % 49 + 1;
+        return rand() % 50 + 1;
     }else{ 
-        return rand() % 99 + 1;
+        return rand() % 100 + 1;
     }
 }
 
@@ -146,18 +174,18 @@ char generateOperator(int difficulty){
         index = rand() % 2;
     }else if(difficulty == 2){ 
         index = rand() % 3;
-    }else if(difficulty == 3){ 
-        index = rand() % 4;
     }
     return op[index];
 }
     
 void playBloomMath(int difficulty){
+    WordProblem questions[20];
+    randomProblem(questions);
     int totalQuestions = 0;
     int score = 0;
-    int lives = 3;
     double correctAnswer = 0;
     double ans;
+    
 
     if(difficulty == 1){
         totalQuestions = 10;
@@ -167,21 +195,21 @@ void playBloomMath(int difficulty){
         totalQuestions = 20;
     }
 
-    for(int i = 1; i <= totalQuestions; ++i){
+    for(int i = 0; i < totalQuestions; i++){
         int n1 = generateNumber(difficulty);
         int n2 = generateNumber(difficulty);
         char op = generateOperator(difficulty);
 
-        if(difficulty == 1 && op == '-' && n1 < n2){
+        if(difficulty == 1 && op == '-' && n1 < n2){ // Ensures that there will not be any negative answers.
             swap(n1 ,n2);
         }
 
-        if(difficulty == 2 && op == '*'){
+        if(difficulty == 2 && op == '*'){ // Caps the max number for multiplication questions to 15.
             n1 = rand() % 14 + 1;
             n2 = rand() % 14 + 1;
         }
 
-        if(difficulty == 3 && op == '/' && n1 < n2){
+        if(difficulty == 3 && op == '/' && n1 < n2){ // Quotients are not always zero.
             swap(n1, n2);
         }
 
@@ -191,27 +219,59 @@ void playBloomMath(int difficulty){
             case '*': correctAnswer = n1 * n2; break;
             case '/': correctAnswer = n1 / n2; break;
         }
-        
+
         setColor(COLOR_TEXT);
-        cout << "\nQuestion #" << i << '\n'
-             << n1 << " " << op << " " << n2 << " = ";
-        cin >> ans;
-        cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        progressBar(i + 1, totalQuestions, difficulty, ans, correctAnswer, questions[i].answer);
+        
+        if(difficulty == 1 || difficulty == 2){
+            setColor(COLOR_TEXT);
+            cout << "\n\nQuestion #" << i + 1 << '\n'
+                 << n1 << " " << op << " " << n2 << " = ";
+            cin >> ans;
+            cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-        if(ans == correctAnswer){
-            setColor(COLOR_GOOD);
-            cout << "Correct answer!\n";
-            score++;
-        }else if(op == '/' && ans != correctAnswer){
-            setColor(COLOR_BAD);
-            cout << fixed << setprecision(2) 
-                 << "Incorrect! The correct answer was " << correctAnswer << ".\n";
+            if(ans == correctAnswer){
+                setColor(COLOR_GOOD);
+                cout << "\nCorrect answer!\n";
+                score++;
+            }else if(op == '/' && ans != correctAnswer){ // Prints quotients in 2 decimal places.
+                setColor(COLOR_BAD);
+                cout << fixed << setprecision(2) 
+                     << "Incorrect! The correct answer was " << correctAnswer << ".\n";
+            }else{
+                setColor(COLOR_BAD);
+                cout << fixed << setprecision(0) // Reverts it back to whole numbers.
+                     << "Incorrect! The correct answer was " << correctAnswer << ".\n";
+            }
+            pauseScreen();
+            clearScreen();
         }else{
-            setColor(COLOR_BAD);
-            cout << fixed << setprecision(0) 
-                 << "Incorrect! The correct answer was " << correctAnswer << ".\n";
-        }
+            setColor(COLOR_TEXT);
+            cout << "\n\nQuestion #" << i + 1 << '\n' 
+                 << questions[i].question << "\nAnswer: ";
+            cin >> ans;
+            cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
+            if(ans == questions[i].answer){
+                setColor(COLOR_GOOD);
+                cout << "Correct!\n";
+                pauseScreen();
+            }else{
+                setColor(COLOR_BAD);
+                if(questions[i].answer > 999){
+                    cout << "Incorrect! The correct answer is " << commaFormat(questions[i].answer) << ".\n";
+                    setColor(COLOR_TEXT);
+                    cout << "\nExplanation: " << questions[i].explanation << ".\n";
+                    pauseScreen();
+                }else{
+                    cout << "Incorrect! The correct answer is " << questions[i].answer << ".\n";
+                    setColor(COLOR_TEXT);
+                    cout << "\nExplanation: " << questions[i].explanation << ".\n";
+                    pauseScreen();
+                }
+            }    
+        }
+        clearScreen();
     }
     setColor(COLOR_TEXT);
     cout << "\nYour final score is: " << score << " / " << totalQuestions << '\n';
@@ -238,18 +298,21 @@ void bloomMathMenu() {
             setColor(COLOR_GOOD);
             cout << "You have selected easy mode!\n";
             pauseScreen();
+            clearScreen();
             playBloomMath(choice);
             break;
         case 2:
             setColor(COLOR_INFO);
             cout << "You have selected medium mode!\n";
             pauseScreen();
+            clearScreen();
             playBloomMath(choice);
             break;
         case 3:
             setColor(COLOR_BAD);
             cout << "You have selected hard mode!\n";
             pauseScreen();
+            clearScreen();
             playBloomMath(choice);
             break;
         case 0:
@@ -364,7 +427,7 @@ void jankenPonMenu(){
             break;
         case 'P':
         case 'p':
-            cout << "You chose paper!\n";
+            cout << "You chose Paper!\n";
             pauseScreen();
             clearScreen();
             jankenPonCountdown();
@@ -375,7 +438,7 @@ void jankenPonMenu(){
             break;
         case 'S':
         case 's':
-            cout << "You chose scissors!\n";
+            cout << "You chose Scissors!\n";
             pauseScreen();
             clearScreen();
             jankenPonCountdown();
